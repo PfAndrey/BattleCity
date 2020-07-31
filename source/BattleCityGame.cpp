@@ -235,7 +235,14 @@ void CTank::update(int delta_time)
 		{
 			last_fire_time += delta_time;
 			if (m_shielding)
+			{
 				m_shield_sh->update(delta_time);
+
+				if (m_time > 4000)
+				{
+					turnOffShield();
+				}
+			}
 			break;
 		}
 	}
@@ -286,7 +293,7 @@ void CTank::damage()
 	if (!isShielding() && m_state == CTank::EState::normal)
 	{
 		m_health--;
-		if (!m_health)
+		if (m_health <= 0)
 		{
 			detonate();
 		}
@@ -338,7 +345,7 @@ CTankPlayer::CTankPlayer(CMap* map): CTank(map)
 {
 	setName("PlayerTank");
 	setDirection(Vector::up);
-	 
+	
 	auto texture = CBattleCityGame::instance()->textureManager().get("battle_city_sheet");
 
 	for (int i = 0; i < 4; ++i)
@@ -372,6 +379,8 @@ void CTankPlayer::update(int delta_time)
 
 			Vector input_direction = CBattleCityGame::instance()->inputManager().getXYAxis();
 			
+			//std::cout << input_direction.x << "|" << input_direction.y << std::endl;
+
 			if (input_direction.x && input_direction.y) input_direction.y = 0;
 			
 			Vector old_direction = getDirection();
@@ -423,14 +432,7 @@ void CTankPlayer::update(int delta_time)
 				}
 			}
 			
-			if (isShielding())
-			{
-				if (m_time > 4000)
-					turnOffShield();
-			}
-
 			break;
-
 		}
 	}
 }
@@ -466,6 +468,7 @@ void CTankPlayer::promote()
 void CTankPlayer::spawn(const Vector& position, const Vector& direction)
 {
 	setRank(0);
+	m_health = 1;
 	setState(CTank::EState::borning);
 	setPosition(position);
 	setDirection(direction);
@@ -1475,7 +1478,10 @@ void CMap::update(int delta_time)
 			});
 		m_timer = 0;
 	
+#ifdef VISUAL_DEBUG
 		getParent()->findObjectByName<CHPAVisualiser>("HPAVisualiser")->refresh();
+#endif // VISUAL_DEBUG
+
 	}
 }
 

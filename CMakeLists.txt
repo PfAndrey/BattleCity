@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(BattleCity VERSION 0.99 LANGUAGES C CXX)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
 if(NOT CMAKE_BUILD_TYPE)
  set(CMAKE_BUILD_TYPE "Release")
@@ -9,7 +9,6 @@ endif()
 # BUILD EXTERNAL LIBRARIES
 include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
 ExternalProject_Add(SFML 
-		#GIT_REPOSITORY https://github.com/SFML/SFML.git GIT_TAG 2.5.1 
 		SOURCE_DIR  ${CMAKE_SOURCE_DIR}/ext/SFML 
     		CMAKE_ARGS 
 			-DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
@@ -58,6 +57,6 @@ if (WIN32)
 	set(POST_LIB_DIR "bin")
 endif()
 
-#ADD_CUSTOM_COMMAND(TARGET BattleCity POST_BUILD
-#	COMMAND ${CMAKE_COMMAND} -E copy_directory "${SFML_LIB}/${POST_LIB_DIR}" "${CMAKE_CURRENT_BINARY_DIR}"
-#	COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/res" "${CMAKE_CURRENT_BINARY_DIR}/res")
+ADD_CUSTOM_COMMAND(TARGET BattleCity POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory "${SFML_LIB}/${POST_LIB_DIR}" "${CMAKE_CURRENT_BINARY_DIR}"
+	COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/res" "${CMAKE_CURRENT_BINARY_DIR}/res")

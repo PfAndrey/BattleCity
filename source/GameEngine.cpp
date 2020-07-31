@@ -342,9 +342,9 @@ Vector CInputManager::getXYAxis() const
 	if (sf::Joystick::isConnected(0))
 	{
 		value.x = sf::Joystick::getAxisPosition(0, sf::Joystick::Axis::PovX) / 100.f;
-		value.y = -sf::Joystick::getAxisPosition(0, sf::Joystick::Axis::PovY) / 100.f;
+		value.y = sf::Joystick::getAxisPosition(0, sf::Joystick::Axis::PovY) / 100.f;
 		value.x = math::sens(value.x, 0.5f);
-		value.y = math::sens(value.y, 0.5f);
+		value.y = -math::sens(value.y, 0.5f);
 	}
  
 	if (m_axis_keys[0] != -1 && sf::Keyboard::isKeyPressed(m_axis_keys[0])) value.y = -1;
@@ -1708,6 +1708,9 @@ void WaypointSystem::update(int delta_time)
 
 void WaypointSystem::draw(sf::RenderWindow* window)
 {
+
+#ifdef VISUAL_DEBUG
+
 	if (!m_path.empty())
 	{
 		sf::VertexArray vertexes(sf::PrimitiveType::LineStrip);
@@ -1728,6 +1731,9 @@ void WaypointSystem::draw(sf::RenderWindow* window)
 			window->draw(shape);
 		}
 	}
+
+#endif
+
 }
 
 //-------------------------------------------------------------------------------------------------------

@@ -7,7 +7,6 @@
 #include <memory>
 #include <iostream>
 #include "GameEngine.h"
-
 #include <future>
 #include <thread> 
 
@@ -98,7 +97,6 @@ protected:
 	bool isOvercharged() const;
 	float m_speed = 0;
 	CMap* m_map;
-	int m_time;
 	Animator m_animator;
 	float m_bullet_speed = 0.5;
 	int m_firing_rate = 300;
@@ -107,6 +105,7 @@ protected:
 	int m_health = 1;
 
 private:
+	int m_time;
 	int m_bullets_in_moving = 0;
 	EState  m_state;
 	CSpriteSheet* m_shield_sh;
@@ -392,7 +391,6 @@ class CCurtains : public CGameObject
 		 m_shadow.setSize(rect.size());
 		 m_shadow.setFillColor(sf::Color::Black);
 
-		 
 		 m_state = 3;
 	 }
 	 ~CCurtains()
@@ -439,8 +437,6 @@ class CCurtains : public CGameObject
 		 if (m_state == 0 && m_h > (size.y /2)) m_state = 1;
 		 if (m_state == 1 && m_timer > 1000) { m_timer = 0;  m_state = 2; }
 		 if (m_state == 2 && m_h < 0 ) m_state = 3;
-
-
 
 		 m_up_curtain.setPosition(sf::Vector2f(0,  - size.y/2  +  m_h ));
 		 m_down_curtain.setPosition( 0, size.y - m_h );
