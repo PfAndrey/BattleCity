@@ -1,0 +1,5 @@
+Build/
+build/
+CMakeLists.txt.user
+.vs/
+*.autosave
