@@ -19,22 +19,36 @@ set(SFML_LIB ${INSTALL_DIR})
 # ADD SOURCE FILES AND HEADERS OF EXECUTABLE
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include ${SFML_LIB}/include ${TINY_XML_LIB}/include)
 
-set(SOURCE
-	${CMAKE_SOURCE_DIR}/source/GameEngine.h
-	${CMAKE_SOURCE_DIR}/source/GameEngine.cpp
-	${CMAKE_SOURCE_DIR}/source/Geometry.h
-	${CMAKE_SOURCE_DIR}/source/Geometry.cpp
-	${CMAKE_SOURCE_DIR}/source/TileMap.h
+set(SOURCE_ENGINE
+	${CMAKE_SOURCE_DIR}/source/GameEngine/GameEngine.h
+	${CMAKE_SOURCE_DIR}/source/GameEngine/GameEngine.cpp
+	${CMAKE_SOURCE_DIR}/source/GameEngine/Geometry.h
+	${CMAKE_SOURCE_DIR}/source/GameEngine/Geometry.cpp
+	${CMAKE_SOURCE_DIR}/source/GameEngine/Graphs.h
+	${CMAKE_SOURCE_DIR}/source/GameEngine/Graphs.cpp
+	${CMAKE_SOURCE_DIR}/source/GameEngine/TileMap.h
+	${CMAKE_SOURCE_DIR}/source/GameEngine/HierarchicalPathFinder.h
+)
+
+set(SOURCE_GAME
 	${CMAKE_SOURCE_DIR}/source/BattleCityGame.h
 	${CMAKE_SOURCE_DIR}/source/BattleCityGame.cpp
+	${CMAKE_SOURCE_DIR}/source/Pickups.h
+	${CMAKE_SOURCE_DIR}/source/Pickups.cpp
 	${CMAKE_SOURCE_DIR}/source/Main.cpp
 )
  
+source_group("GameEngine"	FILES ${SOURCE_ENGINE})
+source_group("BattleCity"	FILES ${SOURCE_GAME})
+
+
 # LINK EXTERNAL LIBRARIES TO EXECUTABLE
 LINK_DIRECTORIES(${SFML_LIB}/lib)
 
 # ADD EXECUTABLE
-add_executable(BattleCity ${SOURCE})
+
+add_executable(BattleCity ${SOURCE_ENGINE} ${SOURCE_GAME})
+
 if (MSVC)
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT BattleCity)
 	set_target_properties( BattleCity PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/Build")

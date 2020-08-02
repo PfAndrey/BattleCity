@@ -6,9 +6,11 @@
 #include "assert.h"
 #include <memory>
 #include <iostream>
-#include "GameEngine.h"
+#include "GameEngine/GameEngine.h"
 #include <future>
 #include <thread> 
+
+#include "GameEngine/HierarchicalPathFinder.h"
 
 enum ETiles { empty, brick, armor, wood, border, lake };
 
@@ -270,84 +272,14 @@ public:
 	}
 };
 
-class CBonus : public CGameObject
-{
- public:
-	 CBonus();
-	 void postDraw(sf::RenderWindow* render_window);
-	 void update(int delta_time);
-	 void pickup();
-	 bool isPickuping() const;
-	 virtual void reset();
- protected:
-	 void setSprite(const sf::Sprite& sprite);
-	 int getTime() const;
-	 void resetTime();
- private:
-	 bool m_pickuped = false;
-	 float m_timer = 0;
-	 const int size = 50;
-	 sf::Sprite m_sprite;
-};
-
-
-class CGrenede : public CBonus
-{
-public:
-	CGrenede();
-	void update(int delta_time) override;
-	void detonate();
-
-};
-
-class CFreezer : public CBonus
-{
-public:
-	CFreezer();
-	void update(int delta_time) override;
-	virtual void reset();
-private:
-	int m_step = 0;
-};
-
-class CHelmet : public CBonus
-{
-public:
-	CHelmet();
-	void update(int delta_time) override;
-	virtual void reset();
-private:
-	int m_step = 0;
-};
-
-class CShovel : public CBonus
-{
-private:
-	int m_step = 0;
-	std::vector<Vector> m_cells;
-	CMap* m_map = nullptr;
-	void fence(const ETiles& tile);
-	virtual void onActivated() override;
-	virtual void reset();
-public:
-	CShovel();
-
-	void update(int delta_time) override;
-
-};
-
 class LifeBar : public CGameObject
 {
 public:
 	LifeBar(const sf::Sprite& life_sprite, int cols, int rows);
 	void setBackgroundColor(const sf::Color& color);
 	void setValue(int value);
-	void decrease()
-	{
-		m_value--;
-	}
+	void decrease();
 	void draw(sf::RenderWindow* render_window) override;
-
   private:
 	  int m_value;
 	  int m_rows, m_cols;
@@ -355,93 +287,15 @@ public:
 	sf::Sprite m_life_sprite;
 };
 
-class CStar : public CBonus
-{
-public:
-	CStar();
-	void update(int delta_time) override;
-};
-
-class CLife : public CBonus
-{
-public:
-	CLife();
-	void update(int delta_time) override;
-};
 
 class CCurtains : public CGameObject
 {
  public:
-	 CCurtains(const Rect& rect, const sf::Font& font)
-	 {
-		 setBounds(rect);
-		 m_up_curtain.setPosition({0,0});
-		 m_up_curtain.setSize({ rect.width(),rect.height() / 2 });
-
-		  m_down_curtain.setPosition({0,rect.height()/2});
-		  m_down_curtain.setSize({ rect.width(),rect.height() / 2 });
-
-		 m_up_curtain.setFillColor(sf::Color(180, 180, 180));
-		 m_down_curtain.setFillColor(sf::Color(180,180,180));
-		 m_label = new CLabel();
-		 m_label->setFontName(font);
-		 m_label->setPosition(rect.center());
-		 
-		 m_shadow.setPosition({ 0,0 });
-		 m_shadow.setSize(rect.size());
-		 m_shadow.setFillColor(sf::Color::Black);
-
-		 m_state = 3;
-	 }
-	 ~CCurtains()
-	 {
-		 delete m_label;
-	 }
-	 void play(const std::string& text, bool shadowed = false)
-	 {
-		 m_shadowed = shadowed;
-		 m_timer = 0;
-		 m_state = 0;
-		 m_label->setString(text);
-	 }
-
-	 void postDraw(sf::RenderWindow* render_window)
-	 {
-		 if (m_shadowed)
-			 if (m_state == 0)
-				 render_window->draw(m_shadow);
-
-		 render_window->draw(m_up_curtain);
-		 render_window->draw(m_down_curtain);
-		 if (m_timer > 200 && m_timer < 800)
-		  m_label->draw(render_window);
-	 }
-
-
-	 void update(int delta_time)
-	 {
-		 CGameObject::update(delta_time);
-
-		 auto size = getBounds().size();
-
-		 
-		 //States
-		 if (m_state == 0)
-			 m_h+=0.3* delta_time;
-		 else if (m_state == 1)
-			 m_timer += delta_time;
-		 else if (m_state == 2)
-			 m_h -= 0.3* delta_time;
-		 
-		 //Trasitions
-		 if (m_state == 0 && m_h > (size.y /2)) m_state = 1;
-		 if (m_state == 1 && m_timer > 1000) { m_timer = 0;  m_state = 2; }
-		 if (m_state == 2 && m_h < 0 ) m_state = 3;
-
-		 m_up_curtain.setPosition(sf::Vector2f(0,  - size.y/2  +  m_h ));
-		 m_down_curtain.setPosition( 0, size.y - m_h );
-
-	 }
+	 CCurtains(const Rect& rect, const sf::Font& font);
+	 ~CCurtains();
+	 void play(const std::string& text, bool shadowed = false);
+	 void postDraw(sf::RenderWindow* render_window);
+	 void update(int delta_time);
 
  private:
 	 float m_h = 0;

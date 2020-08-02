@@ -324,7 +324,6 @@ class CMusicManager : public ResourceManager<sf::Music>
 		std::string m_current_music;
 };
 
-
 class CGame
 {
 private:
