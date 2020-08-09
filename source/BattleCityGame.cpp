@@ -803,7 +803,6 @@ void CBattleCityGameScene::loadStage(int index)
 	m_stage_label->setString("Stage " + toString(m_stage_index));
 
 	addObject(new CHPAVisualiser(m_walls));
-
 }
 
 void CBattleCityGameScene::reset()
@@ -1138,21 +1137,25 @@ void CBattleCityGameScene::update(int delta_time)
 	});
 
 	// TANKS COLLISION PROCESSING
-	auto setOldPosition = [delta_time](CTank* tank)
+	static const auto setOldPosition = [delta_time](CTank* tank)
 	{
 		tank->setPosition(tank->getPosition() - delta_time*tank->getSpeed()*tank->getDirection());
 		tank->setSpeed(0);
 	 	tank->stop();
 	};
-
-
-	// tank vs tanks colliding
+	
 	for (int i = 0; i < tanks.size(); ++i)
-		for (int j = i+1; j < tanks.size(); ++j)
-	    {
-			auto tank_one = tanks[i];
+	{
+		auto tank_one = tanks[i];
+
+		if (!tank_one->isAlive())
+			continue;
+
+		// tank vs tanks colliding
+		for (int j = i + 1; j < tanks.size(); ++j)
+		{
 			auto tank_two = tanks[j];
-			
+
 			if (!tank_two->isAlive())
 				continue;
 
@@ -1165,46 +1168,46 @@ void CBattleCityGameScene::update(int delta_time)
 					setOldPosition(tank_one);
 					setOldPosition(tank_two);
 				}
-				else 
-				{ 
+				else
+				{
 					Vector own_tank_center = tank_one->getBounds().center();
 					Vector other_tank_center = tank_two->getBounds().center();
 					Vector own_tank_bamper = own_tank_center + 25 * tank_one->getDirection();
 					Vector other_tank_bamper = other_tank_center + 25 * tank_two->getDirection();
 					Vector coll_center = (own_tank_center + other_tank_center) / 2;
 					if ((own_tank_bamper - coll_center).length() < (other_tank_bamper - coll_center).length())  //first tank cause
+					{
 						setOldPosition(tank_one);
-					else                                                                                    
+					}
+					else
+					{
 						setOldPosition(tank_two);
+					}
 				}
 			}
-	}
-	
-	for (auto tank : tanks)
-	{
+		}
+
 		// tank vs walls colliding
-		Vector future_pos = tank->getPosition() + delta_time*tank->getSpeed()*tank->getDirection();
-		Rect future_bounds = Rect(future_pos, tank->getBounds().size());
+		Vector future_pos = tank_one->getPosition() + delta_time * tank_one->getSpeed() * tank_one->getDirection();
+		Rect future_bounds = Rect(future_pos, tank_one->getBounds().size());
 		if (m_walls->isCollide(future_bounds, { ETiles::empty, ETiles::wood }))
 		{
-			tank->stop();
-			tank->setPosition(m_walls->alignToTiles(tank->getPosition()));
+			tank_one->stop();
+			tank_one->setPosition(m_walls->alignToTiles(tank_one->getPosition()));
 		}
 
-		// - tanks vs Eagle colliding
-		if (m_eagle->getBounds().isIntersect(tank->getBounds()))
+		// tanks vs Eagle colliding
+		if (m_eagle->getBounds().isIntersect(tank_one->getBounds()))
 		{
-			tank->stop();
-			setOldPosition(tank);
+			setOldPosition(tank_one);
 		}
 	}
-
+	
 	//GO TO NEXT LEVEL PROCESSING
-	if (!m_need_next_level_state && m_enemy_crash_counter >= m_tanks_on_level)
+	if (m_enemy_crash_counter >= m_tanks_on_level && m_need_next_level_state == 0)
 	{
 		m_need_next_level_state = 1;
 		m_next_level_timer = 0;
-
 	}
 
 	if (m_need_next_level_state > 0)
@@ -1217,52 +1220,52 @@ void CBattleCityGameScene::update(int delta_time)
 			m_curtains->play("Stage " + toString(m_stage_index), m_stage_index == 1 ? true : false);
 			m_need_next_level_state = 2;
 			hideHUD();
-		}
+		}	else
 		if (m_need_next_level_state == 2 && m_next_level_timer > 4500)
 		{
 			m_player->hide();
 			loadStage(m_stage_index);
 			m_need_next_level_state = 3;
 			CBattleCityGame::instance()->playSound("stage_start");
-		}
+		}	else
 		if (m_need_next_level_state == 3 && m_next_level_timer > 6500)
 		{
-			showHUD();
-			m_enemy_spawn_counter = 0;
-			m_enemy_crash_counter = 0;
-			m_enemy_tanks_bar->setValue(m_tanks_on_level);
-			m_enemy_spawn_timer = 0;
-			m_player->show();
-			spawnPlayerTank();
+			m_enemy_spawn_counter = m_enemy_spawn_timer = m_enemy_crash_counter = 0;
 			m_need_next_level_state = 0;
-		}
+			m_enemy_tanks_bar->setValue(m_tanks_on_level);
+			showHUD();
+			spawnPlayerTank();
+			m_player->show();
+		}	
 	}
 
 	// GAME OVER PROCESSING
 	if (m_need_game_over_state > 0)
+	{
 		m_game_over_timer += delta_time;
 
-	if (m_need_game_over_state == 1)
-	{
-		m_game_over_label->show();
-	    m_need_game_over_state = 2;
-	}
-    if (m_need_game_over_state == 2 && m_dy > 0)
-    {
-		m_game_over_label->setPosition(Vector(300.f,330.f+m_dy*delta_time/5));
-		m_dy--;		
-    }
-
-	if (m_game_over_timer > 4000)
-	{
-		auto menu = getParent()->findObjectByName<CBattleCityMenuScene>("MenuScene");
-		menu->reset();
-		menu->turnOn();
-		turnOff();
+		if (m_need_game_over_state == 1)
+		{
+			m_game_over_label->show();
+			m_need_game_over_state = 2;
+		}	else
+		if (m_need_game_over_state == 2 && m_dy > 0)
+		{
+			m_game_over_label->setPosition(Vector(300.f, 330.f + m_dy * delta_time / 5));
+			m_dy--;
+		}	else 
+		if (m_game_over_timer > 4000)
+		{
+			auto menu = getParent()->findObjectByName<CBattleCityMenuScene>("MenuScene");
+			menu->reset();
+			menu->turnOn();
+			turnOff();
+		}
 	}
 }
 
 //----------------------------------------------------------------------------------------------------------
+
 CBattleCityMenuScene::CBattleCityMenuScene()
 {
 	setName("MenuScene");
@@ -1512,8 +1515,10 @@ std::vector<Vector> CMap::toPixelCoordinates(const std::vector<Vector>& points)
 Vector CMap::toMapCoordinates(const Vector& point, bool rounded)
 {
 	if (rounded)
+	{
 		return round(point / tile_size);
-	 return  point/tile_size;
+	}
+	return  point/tile_size;
 }
 
 //------------------------------------------------------------------------------------------------------------
