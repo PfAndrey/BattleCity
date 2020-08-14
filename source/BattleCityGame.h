@@ -87,7 +87,7 @@ public:
 	bool isDetonated() const;
 	void setState(EState state);
 	EState getState() const;
-	void turnOnShield();
+	void turnOnShield(int time);
 	void turnOffShield();
 	bool isShielding() const;
 	void onBulletDetonated();
@@ -113,7 +113,7 @@ private:
 	int m_bullets_in_moving = 0;
 	EState  m_state;
 	CSpriteSheet* m_shield_sh;
-	bool m_shielding;
+	int m_shielding = 0;
 };
 
 class CTankPlayer : public CTank

@@ -25,9 +25,9 @@ void CBonus::update(int delta_time)
 	}
 }
 
-void CBonus::pickup()
+void CBonus::pickup(CTank* pickuper)
 {
-	m_pickuped = true;
+	m_pickuper = pickuper;
 	if (!isTypeOf<CLife>())
 	{
 		CBattleCityGame::instance()->playSound("bonus-picked");
@@ -36,7 +36,7 @@ void CBonus::pickup()
 
 bool CBonus::isPickuping() const
 {
-	return m_pickuped;
+	return m_pickuper != nullptr;
 }
 
 void CBonus::setSprite(const sf::Sprite& sprite)
@@ -75,7 +75,6 @@ void CGrenede::update(int delta_time)
 	{
 		getParent()->castTo<CBattleCityGameScene>()->blowupAllTanks();
 		getParent()->removeObject(this);
-
 	}
 }
 
@@ -98,7 +97,10 @@ void CFreezer::update(int delta_time)
 			this->hide();
 			auto enemy_tanks = getParent()->findObjectsByType<CEnemyTank>();
 			for (auto enemy_tank : enemy_tanks)
-				enemy_tank->setFreezed(true);
+			{
+				enemy_tank->stop();
+			}
+			CEnemyTank::setFreezed(true);
 			m_step++;
 			resetTime();
 		}
@@ -111,7 +113,6 @@ void CFreezer::update(int delta_time)
 			getParent()->removeObject(this);
 			m_step++;
 		}
-
 	}
 }
 
@@ -136,25 +137,8 @@ void CHelmet::update(int delta_time)
 
 	if (isPickuping())
 	{
-		if (m_step == 0)
-		{
-			this->hide();
-			auto players = getParent()->findObjectsByType<CTankPlayer>();
-			for (auto player : players)
-				player->turnOnShield();
-
-			m_step++;
-			resetTime();
-		}
-		else if (m_step == 1 && getTime() > BattleCityConsts::TIME_OF_HELMET)
-		{
-			auto players = getParent()->findObjectsByType<CTankPlayer>();
-			for (auto player : players)
-				player->turnOffShield();
-
-			getParent()->removeObject(this);
-			m_step++;
-		}
+		m_pickuper->turnOnShield(BattleCityConsts::TIME_OF_HELMET);
+		getParent()->removeObject(this);
 	}
 }
 
@@ -252,12 +236,8 @@ void CStar::update(int delta_time)
 
 	if (isPickuping())
 	{
-		auto player_tank = getParent()->findObjectByName<CTankPlayer>("PlayerTank");
-
-		player_tank->promote();
-
+		m_pickuper->castTo<CTankPlayer>()->promote(); 
 		getParent()->removeObject(this);
-
 	}
 }
 
@@ -265,7 +245,6 @@ void CStar::update(int delta_time)
 
 CLife::CLife()
 {
-
 	sf::Sprite sprite(*CBattleCityGame::instance()->textureManager().get("battle_city_sheet"), { 250,100,50,50 });
 	setSprite(sprite);
 }

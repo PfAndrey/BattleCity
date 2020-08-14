@@ -1,7 +1,8 @@
-#ifndef  PICKUPS_H
+#ifndef PICKUPS_H
 #define PICKUPS_H
 
 #include "GameEngine/GameEngine.h"
+class CTank;
 
 class CBonus : public CGameObject
 {
@@ -9,15 +10,15 @@ class CBonus : public CGameObject
 	 CBonus();
 	 void postDraw(sf::RenderWindow* render_window);
 	 void update(int delta_time);
-	 void pickup();
+	 void pickup(CTank* pickuper);
 	 bool isPickuping() const;
 	 virtual void reset();
  protected:
 	 void setSprite(const sf::Sprite& sprite);
 	 int getTime() const;
 	 void resetTime();
+	 CTank* m_pickuper = nullptr;
  private:
-	 bool m_pickuped = false;
 	 float m_timer = 0;
 	 const int size = 50;
 	 sf::Sprite m_sprite;
@@ -47,8 +48,6 @@ public:
 	CHelmet();
 	void update(int delta_time) override;
 	virtual void reset();
-private:
-	int m_step = 0;
 };
 
 class CMap;

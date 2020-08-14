@@ -172,21 +172,21 @@ CTank::CTank(CMap* map)
 	setSize({ 50,50 });
 }
 
-void CTank::turnOnShield()
+void CTank::turnOnShield(int time)
 {
 	m_shield_sh->turnOn();
-	m_shielding = true;
+	m_shielding = time;
 }
 
 void CTank::turnOffShield()
 {
 	m_shield_sh->turnOff();
-	m_shielding = false;
+	m_shielding = 0;
 }
 
 bool CTank::isShielding() const
 {
-	return m_shielding;
+	return m_shielding >=0 ;
 }
 
 void CTank::setState(EState state)
@@ -244,6 +244,7 @@ void CTank::update(int delta_time)
 				{
 					turnOffShield();
 				}
+				m_shielding -= delta_time;
 			}
 			break;
 		}
@@ -317,7 +318,7 @@ void CTank::draw(sf::RenderWindow* window)
 	m_animator.setPosition(getPosition());
 	m_animator.draw(window);
  
-	if (isShielding() && m_state == EState::normal)
+	if (isShielding() && isAlive())
 	{
 		m_shield_sh->setPosition(getPosition());
 		m_shield_sh->draw(window);
@@ -366,7 +367,7 @@ CTankPlayer::CTankPlayer(CMap* map): CTank(map)
 		m_animator.get("down"+rank)->setRotation(90);
 	}
  
-	turnOnShield();
+	turnOnShield(4000);
 	setBodyColor(sf::Color(255,255,102));
 	m_rank = 0;
 }
@@ -465,8 +466,11 @@ int CTankPlayer::getRank() const
 void CTankPlayer::promote()
 {
 	int rank = m_rank + 1;
-	if (rank > 3)
+	if (rank >= 3)
+	{
+		m_health = 2;
 		rank = 3;
+	}
 	setRank(rank);
 }
 
@@ -477,7 +481,7 @@ void CTankPlayer::spawn(const Vector& position, const Vector& direction)
 	setState(CTank::EState::borning);
 	setPosition(position);
 	setDirection(direction);
-	turnOnShield();
+	turnOnShield(4000);
 }
 
 void CTankPlayer::fire(bool armored)
@@ -1013,7 +1017,7 @@ void CBattleCityGameScene::update(int delta_time)
 		{
 			if (obj->getBounds().isIntersect(m_player->getBounds()))
 			{
-				obj->castTo<CBonus>()->pickup();
+				obj->castTo<CBonus>()->pickup(m_player);
 				m_float_text->splash(obj->getBounds().center(), "+500");
 				addScore(500);
 			}
@@ -1089,6 +1093,7 @@ void CBattleCityGameScene::update(int delta_time)
 							{
 								end_status = Endstatus::damage;
 							}
+							break;
 						}
 					}
 					else // player's tank
