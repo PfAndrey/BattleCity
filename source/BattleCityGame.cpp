@@ -36,7 +36,8 @@ CBattleCityGame::CBattleCityGame() : CGame("Battle City", { 825, 700 })
 
 	//Load sounds
 	const std::string sounds_dir = "res/Sounds/";
-	for (auto sound : { "stage_start" } )
+	for (auto sound : { "stage_start", "1-up", "armor-push", "block-broken", "bonus-picked",
+		"bonus-spawned", "damage", "enemy-boom", "player-boom", "fire", "click", "pause", "unpause" } )
 		soundManager().loadFromFile(sound, sounds_dir + sound + ".ogg");
  
 	//Configure input
@@ -235,7 +236,7 @@ void CTank::update(int delta_time)
 		case(EState::normal):
 		{
 			last_fire_time += delta_time;
-			if (m_shielding)
+			if (isShielding())
 			{
 				m_shield_sh->update(delta_time);
 
@@ -286,12 +287,17 @@ void CTank::detonate()
 
 bool CTank::isAlive() const
 {
-	return m_state != CTank::EState::detonate;
+	return m_state == CTank::EState::normal;
+}
+
+bool CTank::isDetonated() const
+{
+	return m_state == CTank::EState::detonate;
 }
 
 void CTank::damage()
 {
-	if (!isShielding() && m_state == CTank::EState::normal)
+	if (!isShielding() && isAlive())
 	{
 		m_health--;
 		if (m_health <= 0)
@@ -311,7 +317,7 @@ void CTank::draw(sf::RenderWindow* window)
 	m_animator.setPosition(getPosition());
 	m_animator.draw(window);
  
-	if (m_shielding && m_state == EState::normal)
+	if (isShielding() && m_state == EState::normal)
 	{
 		m_shield_sh->setPosition(getPosition());
 		m_shield_sh->draw(window);
@@ -380,8 +386,6 @@ void CTankPlayer::update(int delta_time)
 
 			Vector input_direction = CBattleCityGame::instance()->inputManager().getXYAxis();
 			
-			//std::cout << input_direction.x << "|" << input_direction.y << std::endl;
-
 			if (input_direction.x && input_direction.y) input_direction.y = 0;
 			
 			Vector old_direction = getDirection();
@@ -456,7 +460,7 @@ void CTankPlayer::setRank(int rank)
 int CTankPlayer::getRank() const
 {
 	return m_rank;
-}
+} 
 
 void CTankPlayer::promote()
 {
@@ -476,6 +480,11 @@ void CTankPlayer::spawn(const Vector& position, const Vector& direction)
 	turnOnShield();
 }
 
+void CTankPlayer::fire(bool armored)
+{
+	CTank::fire(armored);
+	CBattleCityGame::instance()->playSound("fire");
+}
 //------------------------------------------------------------------------------------------------------
 
 CEnemyTank::CEnemyTank(CMap* map, CTankPlayer* player, Type type) : CTank(map)
@@ -859,7 +868,7 @@ CEnemyTank* CBattleCityGameScene::spawnEnemyTank()
 		CEnemyTank::Type tank_type;
 		for (auto& pair : m_tanks_table[m_stage_index - 1])
 		{
-			i = i + pair.first;
+			i += pair.first;
 			if (i > m_enemy_spawn_counter)
 			{
 				tank_type = pair.second;
@@ -892,6 +901,7 @@ void CBattleCityGameScene::addLifeToPlayerTank()
 {
 	m_player_tanks_lifes++;
 	m_lifes_label->setString("Lifes: " + toString(m_player_tanks_lifes));
+	CBattleCityGame::instance()->playSound("1-up");
 }
 
 void CBattleCityGameScene::removeLifeFromPlayerTank()
@@ -1011,6 +1021,8 @@ void CBattleCityGameScene::update(int delta_time)
 
 		if (obj->getName() == "Bullet" && !obj->castTo<CBullet>()->isDetonated())
 		{
+			enum class Endstatus { none, block_broken, armor_push, player_detonate, enemy_detonate, bullet_bullet, damage } end_status = Endstatus::none;
+
 			CBullet* bullet = obj->castTo<CBullet>();
 			bool armored = bullet->isArmorPiercing();
 
@@ -1029,14 +1041,18 @@ void CBattleCityGameScene::update(int delta_time)
 						if (brick_type == ETiles::brick || (brick_type == ETiles::armor && bullet->isArmorPiercing()))
 						{
 							m_walls->getMap()->setCell(pos.x, pos.y, ETiles::empty);
+							end_status = Endstatus::block_broken;
 						}
-						bullet->detonate();
+						else
+						{
+							end_status = Endstatus::armor_push;
+						}
 						break;
 					}
 				}
 				else
 				{
-					bullet->detonate();
+					end_status = Endstatus::armor_push;
 					break;
 				}
 			}
@@ -1048,11 +1064,10 @@ void CBattleCityGameScene::update(int delta_time)
 				{
 					if (tank != m_player) //enemy's tank
 					{
-						if (bullet->source() == m_player)
+						if (bullet->source() == m_player && tank->isAlive())
 						{
 							tank->damage();
-							bullet->detonate();
-
+							
 							if (tank->castTo<CEnemyTank>()->isFlashing())
 							{
 								CBonus* bonus = getRandomBonus();
@@ -1062,31 +1077,38 @@ void CBattleCityGameScene::update(int delta_time)
 								tank->castTo<CEnemyTank>()->setFlashed(false);
 							}
 							int score = ((int)tank->castTo<CEnemyTank>()->type() + 1) * 100;
-							if (!tank->isAlive())
+							if (tank->isDetonated())
 							{
 								m_float_text->splash(tank->getBounds().center(), "+" + toString(score));
 								m_enemy_tanks_bar->decrease();
 								m_enemy_crash_counter++;
 								addScore(score);
+								end_status = Endstatus::enemy_detonate;
+							}
+							else
+							{
+								end_status = Endstatus::damage;
 							}
 						}
-
 					}
 					else // player's tank
 					{
-						tank->damage();
-						bullet->detonate();
-
-						if (!tank->isAlive())
+						if (tank->isAlive())
 						{
-							if (m_player_tanks_lifes > 0)
+							tank->damage();
+							end_status = Endstatus::player_detonate;
+
+							if (tank->isDetonated())
 							{
-								removeLifeFromPlayerTank();
-								findObjectByName<Timer>("Timer")->add(sf::seconds(1), [this]() { spawnPlayerTank(); });
-							}
-							else 
-							{
-								m_need_game_over_state = 1;
+								if (m_player_tanks_lifes > 0)
+								{
+									removeLifeFromPlayerTank();
+									findObjectByName<Timer>("Timer")->add(sf::seconds(1), [this]() { spawnPlayerTank(); });
+								}
+								else
+								{
+									m_need_game_over_state = 1;
+								}
 							}
 						}
 					}
@@ -1099,13 +1121,59 @@ void CBattleCityGameScene::update(int delta_time)
 				if (m_eagle->getBounds().isContain(obj->getPosition()))
 				{
 					m_eagle->detonate();
-					bullet->detonate();
+					end_status = Endstatus::player_detonate;
 					m_need_game_over_state = 1;
 					if (m_player->isAlive())
 					{
 						m_player->disable();
 					}
 				}
+			}
+
+			switch (end_status)
+			{
+
+				case(Endstatus::armor_push):
+				{
+					if (bullet->source() == m_player)
+						CBattleCityGame::instance()->playSound("armor-push");
+					break;
+				}
+				case(Endstatus::block_broken):
+				{
+					if (bullet->source() == m_player)
+						CBattleCityGame::instance()->playSound("block-broken");
+					break;
+				}
+				case(Endstatus::enemy_detonate):
+				{
+					if (bullet->source() == m_player)
+						CBattleCityGame::instance()->playSound("enemy-boom");
+					break;
+				}
+				case(Endstatus::damage):
+				{
+					if (bullet->source() == m_player)
+						CBattleCityGame::instance()->playSound("damage");
+					break;
+				}
+				case(Endstatus::player_detonate):
+				{
+					if (m_player->isAlive())
+					{
+						CBattleCityGame::instance()->playSound("damage");
+					}
+					else
+					{
+						CBattleCityGame::instance()->playSound("player-boom");
+					}
+					break;
+				}
+			}
+
+			if (end_status != Endstatus::none)
+			{
+				bullet->detonate();
 			}
 
 			//Bullets crash bullets
@@ -1148,7 +1216,7 @@ void CBattleCityGameScene::update(int delta_time)
 	{
 		auto tank_one = tanks[i];
 
-		if (!tank_one->isAlive())
+		if (tank_one->isDetonated())
 			continue;
 
 		// tank vs tanks colliding
@@ -1156,7 +1224,7 @@ void CBattleCityGameScene::update(int delta_time)
 		{
 			auto tank_two = tanks[j];
 
-			if (!tank_two->isAlive())
+			if (tank_two->isDetonated())
 				continue;
 
 			if (tank_one->getBounds().isIntersect(tank_two->getBounds()))
@@ -1307,40 +1375,45 @@ void CBattleCityMenuScene::update(int delta_time)
 	CGameObject::update(delta_time);
 
 	auto intput_manager = CBattleCityGame::instance()->inputManager();
+	auto input = intput_manager.getXYAxis();
+
 
 	if (m_cursor_label->isVisible())
 	{
-		bool changed = false;
-		if (intput_manager.getXYAxis() == Vector::down)
+		if (!m_prev_input.y && input.y)
 		{
-			m_cursor_pos++;
-			changed = true;
-		}
-		if (intput_manager.getXYAxis() == Vector::up)
-		{
-			m_cursor_pos--;
-			changed = true;
-		}
-		if (m_cursor_pos < 0) m_cursor_pos = 2;
-		if (m_cursor_pos > 2) m_cursor_pos = 0;
-
-		if (changed)
-		{
-			m_cursor_label->setPosition(230, 320 + m_cursor_pos * 60);
+			if (input.y > 0)
+			{
+				m_cursor_pos++;
+				if (m_cursor_pos > 2) 
+					m_cursor_pos = 0;
+			}
+			else 
+			{
+				m_cursor_pos--;
+				if (m_cursor_pos < 0) 
+					m_cursor_pos = 2;
+			}
+			m_cursor_label->setPosition(230, 320 + m_cursor_pos * 60);			
 		}
 
-		if (intput_manager.isButtonDown("Fire") && m_cursor_pos == 0)
+		if (intput_manager.isButtonDown("Fire"))
 		{
-			auto game_scene = getParent()->findObjectByName<CBattleCityGameScene>("GameScene");
-			game_scene->reset();
-			game_scene->turnOn();
-			this->turnOff();
+			if (m_cursor_pos == 0)
+			{
+				auto game_scene = getParent()->findObjectByName<CBattleCityGameScene>("GameScene");
+				game_scene->reset();
+				game_scene->turnOn();
+				this->turnOff();
+			}
 		}
 	}
 	else
 	{
 		if (intput_manager.isButtonDown("Fire"))
+		{
 			m_dy = 1;
+		}
 	}
 
 	if (m_dy == 200)
@@ -1351,7 +1424,6 @@ void CBattleCityMenuScene::update(int delta_time)
 		m_constructor_label->show();
 		m_about_label->show();
 	}
-
 	if (m_dy > 0)
 	{
 		int dy = m_dy*delta_time / 5;
@@ -1362,11 +1434,12 @@ void CBattleCityMenuScene::update(int delta_time)
 		m_about_label->setPosition({ 390,dy + 680 });
 		m_dy--;
 	}
-
 	if (m_dy == 0)
 	{
 		m_cursor_label->show();
 	}
+
+	m_prev_input = input;
 }
 
 void CBattleCityMenuScene::reset()
@@ -1521,6 +1594,16 @@ Vector CMap::toMapCoordinates(const Vector& point, bool rounded)
 	return  point/tile_size;
 }
 
+Vector CMap::alignToTiles(const Vector& pos)
+{
+	return round(pos / tile_size) * tile_size;
+}
+
+HPA_Finder<ETiles>& CMap::HPA_Finder()
+{
+	return m_HPA_finder;
+}
+
 //------------------------------------------------------------------------------------------------------------
 
 LifeBar::LifeBar(const sf::Sprite& life_sprite, int cols, int rows)
@@ -1544,7 +1627,7 @@ void LifeBar::setValue(int value)
 
 void LifeBar::decrease()
 {
-	m_value--;
+	--m_value;
 }
 
 void LifeBar::draw(sf::RenderWindow* render_window) 
@@ -1603,14 +1686,18 @@ void CCurtains::play(const std::string& text, bool shadowed)
 
 void CCurtains::postDraw(sf::RenderWindow* render_window)
 {
-	if (m_shadowed)
-		if (m_state == 0)
-			render_window->draw(m_shadow);
+	if (m_shadowed && m_state == 0)
+	{
+		render_window->draw(m_shadow);
+	}
 
 	render_window->draw(m_up_curtain);
 	render_window->draw(m_down_curtain);
+	
 	if (m_timer > 200 && m_timer < 800)
+	{
 		m_label->draw(render_window);
+	}
 }
 
 void CCurtains::update(int delta_time)

@@ -28,6 +28,10 @@ void CBonus::update(int delta_time)
 void CBonus::pickup()
 {
 	m_pickuped = true;
+	if (!isTypeOf<CLife>())
+	{
+		CBattleCityGame::instance()->playSound("bonus-picked");
+	}
 }
 
 bool CBonus::isPickuping() const

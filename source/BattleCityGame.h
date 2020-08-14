@@ -1,6 +1,8 @@
 #ifndef BATTLECITYGAME_H
 #define BATTLECITYGAME_H
 
+//#define VISUAL_DEBUG 1
+
 #include <vector>
 #include <array>
 #include "assert.h"
@@ -48,7 +50,6 @@ public:
 	void init() override;
 };
 
-
 class CTank;
 
 class CBullet : public CGameObject
@@ -83,6 +84,7 @@ public:
 	void detonate();
 	virtual void damage();
 	bool isAlive() const;
+	bool isDetonated() const;
 	void setState(EState state);
 	EState getState() const;
 	void turnOnShield();
@@ -95,7 +97,7 @@ public:
 protected:
 	void setBodySprite(const Rect& sprite_rect);
 	int bulletsInMoving() const;
-	void fire(bool armored = false);
+	virtual void fire(bool armored = false);
 	bool isOvercharged() const;
 	float m_speed = 0;
 	CMap* m_map;
@@ -111,9 +113,7 @@ private:
 	int m_bullets_in_moving = 0;
 	EState  m_state;
 	CSpriteSheet* m_shield_sh;
-	bool m_space_pressed;
 	bool m_shielding;
- 
 };
 
 class CTankPlayer : public CTank
@@ -126,6 +126,7 @@ public:
 	void promote();
 	void spawn(const Vector& position, const Vector& direction);
 private:
+	virtual void fire(bool armored = false);
 	int m_rank = 0;
 	bool m_space_pressed = false;
 };
@@ -188,7 +189,6 @@ class CBattleCityGameScene : public CGameObject
 	  void blowupAllTanks();
 	  void hideHUD();
 	  void showHUD();
-	
 private:
 	  void loadStage(int stage_index);
   	  CEnemyTank* spawnEnemyTank();
@@ -236,6 +236,7 @@ private:
 	CLabel* m_about_label;
 	int m_cursor_pos;
 	int m_dy;
+	Vector m_prev_input;
 };
  
 class CMap : public CGameObject
@@ -260,16 +261,9 @@ public:
 	Rect toPixelCoordinates(const Rect& rect);
 	std::vector<Vector> toPixelCoordinates(const std::vector<Vector>& points);
     Vector toMapCoordinates(const Vector& point,bool rounded = false);
-	Vector alignToTiles(const Vector& pos)
-	{
-	    return round(pos / tile_size)*tile_size;
-	}
-	
+	Vector alignToTiles(const Vector& pos);
 	bool isCollide(Rect& rect, const std::vector<ETiles>& allowed_cell_types);
-	HPA_Finder<ETiles>& HPA_Finder()
-	{
-		return m_HPA_finder;
-	}
+	HPA_Finder<ETiles>& HPA_Finder();
 };
 
 class LifeBar : public CGameObject
@@ -281,9 +275,9 @@ public:
 	void decrease();
 	void draw(sf::RenderWindow* render_window) override;
   private:
-	  int m_value;
-	  int m_rows, m_cols;
-	  sf::Color m_background_color;
+	int m_value;
+	int m_rows, m_cols;
+	sf::Color m_background_color;
 	sf::Sprite m_life_sprite;
 };
 
@@ -296,7 +290,6 @@ class CCurtains : public CGameObject
 	 void play(const std::string& text, bool shadowed = false);
 	 void postDraw(sf::RenderWindow* render_window);
 	 void update(int delta_time);
-
  private:
 	 float m_h = 0;
 	 int m_timer;
@@ -314,13 +307,10 @@ private:
 	CMap* m_map;
 	HPA_Finder<ETiles> m_HPA_Finder;
 	std::vector<Vector> m_path;
-
 public:
 	CHPAVisualiser(CMap* map);
 	void refresh();
 	void draw(sf::RenderWindow* render_window) override;
 };
-
-
 
 #endif
