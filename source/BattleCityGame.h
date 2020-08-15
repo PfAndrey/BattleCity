@@ -86,8 +86,6 @@ public:
 	virtual void damage();
 	bool isAlive() const;
 	bool isDetonated() const;
-	void setState(EState state);
-	EState getState() const;
 	void turnOnShield(int time);
 	void turnOffShield();
 	bool isShielding() const;
@@ -96,6 +94,8 @@ public:
     float getSpeed() const;
 	virtual void stop();
 protected:
+	EState getState() const;
+	void setState(EState state);
 	void setBodySprite(const Rect& sprite_rect);
 	int bulletsInMoving() const;
 	virtual void fire(bool armored = false);
@@ -108,7 +108,7 @@ protected:
 	int m_last_fire_time;
 	float m_tank_max_speed = 0.1f;
 	int m_health = 1;
-
+	virtual void updateSprite() {};
 private:
 	int m_time;
 	int m_bullets_in_moving = 0;
@@ -125,9 +125,10 @@ public:
 	void setRank(int rank);
 	int getRank() const;
 	void promote();
+	virtual void damage() override;
 	void spawn(const Vector& position, const Vector& direction, bool reset_rank = false);
 private:
-	void updateSprite();
+	virtual void updateSprite() override;
 	virtual void fire(bool armored = false);
 	int m_rank = 0;
 	bool m_space_pressed = false;
@@ -146,6 +147,7 @@ public:
 	virtual void damage() override;
 	virtual void stop() override;
 private:
+	virtual void updateSprite() override;
 	WaypointSystem* m_waypoint_system = NULL;
 	void update(int delta_time) override;
 	bool moveToPoint(const Vector& target_point);

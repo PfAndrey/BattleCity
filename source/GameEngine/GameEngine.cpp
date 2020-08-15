@@ -966,7 +966,7 @@ void CGame::stopMusic()
     m_music_manager.stop();
 }
 
-void  CGame::playSound(const std::string& name)
+void CGame::playSound(const std::string& name)
 {
     const int SOUND_BUFFER_SIZE = 40;
     int i = 0;
