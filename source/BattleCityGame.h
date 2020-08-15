@@ -28,6 +28,8 @@ namespace BattleCityConsts
 	const Vector PLAYER_SPAWN_TILE = { 10, 25 };
 	const Vector EAGLE_TILE = { 13, 25 };
 	const Vector EAGLE_SIZE = { 50, 50 };
+	const float BASIC_BULLET_SPEED = 0.5;
+	const float FAST_BULLET_SPEED = 0.75;
 	const int BONUS_TANKS_ST = 6;
 	const int ENEMY_SPAWN_TIME = 3000; //ms
 	const int BONUS_TIME_ALIVE = 14000; //ms
@@ -104,7 +106,7 @@ protected:
 	Animator m_animator;
 	float m_bullet_speed = 0.5;
 	int m_firing_rate = 300;
-	int last_fire_time;
+	int m_last_fire_time;
 	float m_tank_max_speed = 0.1f;
 	int m_health = 1;
 
@@ -126,6 +128,7 @@ public:
 	void promote();
 	void spawn(const Vector& position, const Vector& direction);
 private:
+	void updateSprite();
 	virtual void fire(bool armored = false);
 	int m_rank = 0;
 	bool m_space_pressed = false;

@@ -145,9 +145,7 @@ void CHelmet::update(int delta_time)
 void CHelmet::reset()
 {
 	CBonus::reset();
-	auto players = getParent()->findObjectsByType<CTankPlayer>();
-	for (auto player : players)
-		player->turnOffShield();
+	m_pickuper->turnOffShield();
 }
 
 //-------------------------------------------------------------------------------------------------------------

@@ -148,13 +148,12 @@ void CBullet::draw(sf::RenderWindow* render_window)
 
 //----------------------------------------------------------------------------------------------
 
-CTank::CTank(CMap* map)
+CTank::CTank(CMap* map):
+	m_tank_max_speed(0.1f),
+	m_map(map),
+	m_last_fire_time(0)
 {
 	setName("Tank");
-	m_tank_max_speed = 0.1f;
-	m_map = map;
-	last_fire_time = 0;
-	
 	auto& text_manager = CBattleCityGame::instance()->textureManager();
 
 	m_animator.create("borning", *text_manager.get("battle_city_sheet"), { 0, 100 }, { 50, 50 }, 4, 1, 0.01, AnimType::forward_backward_cycle);
@@ -235,15 +234,10 @@ void CTank::update(int delta_time)
 		}
 		case(EState::normal):
 		{
-			last_fire_time += delta_time;
+			m_last_fire_time += delta_time;
 			if (isShielding())
 			{
 				m_shield_sh->update(delta_time);
-
-				if (m_time > 4000)
-				{
-					turnOffShield();
-				}
 				m_shielding -= delta_time;
 			}
 			break;
@@ -261,7 +255,7 @@ CTank::EState CTank::getState() const
 
 void CTank::fire(bool armored)
 {
-	last_fire_time = 0;
+	m_last_fire_time = 0;
 	getParent()->addObject(new CBullet(getBounds().center() + getDirection() * 25, getDirection()*m_bullet_speed, this, armored));
 	m_bullets_in_moving++;
 }
@@ -310,7 +304,7 @@ void CTank::damage()
 
 bool CTank::isOvercharged() const
 {
-	return last_fire_time > m_firing_rate;
+	return m_last_fire_time > m_firing_rate;
 }
 
 void CTank::draw(sf::RenderWindow* window)  
@@ -369,7 +363,7 @@ CTankPlayer::CTankPlayer(CMap* map): CTank(map)
  
 	turnOnShield(4000);
 	setBodyColor(sf::Color(255,255,102));
-	m_rank = 0;
+	setRank(0);
 }
 
 void CTankPlayer::update(int delta_time)
@@ -387,8 +381,11 @@ void CTankPlayer::update(int delta_time)
 
 			Vector input_direction = CBattleCityGame::instance()->inputManager().getXYAxis();
 			
-			if (input_direction.x && input_direction.y) input_direction.y = 0;
-			
+			if (input_direction.x && input_direction.y)
+			{
+				input_direction.y = 0; //can move only for one axis 
+			}
+
 			Vector old_direction = getDirection();
 
 			if (input_direction != Vector::zero)
@@ -400,13 +397,7 @@ void CTankPlayer::update(int delta_time)
 			{
 				setPosition(m_map->alignToTiles(getPosition()));
 
-				auto direction = getDirection();
-
-
-				if (direction == Vector::right)  m_animator.play("right_" + toString(m_rank));
-				else if (direction == Vector::left)  m_animator.play("left_" + toString(m_rank));
-				else if (direction == Vector::up)  m_animator.play("up_" + toString(m_rank));
-				else if (direction == Vector::down)  m_animator.play("down_" + toString(m_rank));
+				updateSprite();
 			}
 
 			if (input_direction != Vector::zero)
@@ -431,7 +422,7 @@ void CTankPlayer::update(int delta_time)
 						fire(getRank() >= 3 ? true : false);
 						if (bulletsInMoving() == 2) //two bullets
 						{
-							last_fire_time -= 200;  //with 200 msec interval
+							m_last_fire_time -= 200;  //with 200 msec interval
 						}
 					}
 
@@ -443,6 +434,15 @@ void CTankPlayer::update(int delta_time)
 	}
 }
 
+void CTankPlayer::updateSprite()
+{
+	auto direction = getDirection();
+	if (direction == Vector::right)  m_animator.play("right_" + toString(m_rank));
+	else if (direction == Vector::left)  m_animator.play("left_" + toString(m_rank));
+	else if (direction == Vector::up)  m_animator.play("up_" + toString(m_rank));
+	else if (direction == Vector::down)  m_animator.play("down_" + toString(m_rank));
+}
+
 void CTankPlayer::setRank(int rank)
 {
 	assert(rank >= 0 && rank < 4);
@@ -450,12 +450,14 @@ void CTankPlayer::setRank(int rank)
 
 	if (m_rank == 0)
 	{
-		m_bullet_speed = 0.5;
+		m_bullet_speed = BattleCityConsts::BASIC_BULLET_SPEED;
 	}
 	else
 	{
-		m_bullet_speed = 0.75;
+		m_bullet_speed = BattleCityConsts::FAST_BULLET_SPEED;
 	}
+
+	updateSprite();
 }
 
 int CTankPlayer::getRank() const
@@ -491,16 +493,15 @@ void CTankPlayer::fire(bool armored)
 }
 //------------------------------------------------------------------------------------------------------
 
-CEnemyTank::CEnemyTank(CMap* map, CTankPlayer* player, Type type) : CTank(map)
+CEnemyTank::CEnemyTank(CMap* map, CTankPlayer* player, Type type) 
+	: CTank(map),
+	m_type(type),
+	m_player(player),
+	m_remove_timer(0)
 {
 	setName("EnemyTank");
-	m_type = type;
-	m_player = player;
-
-	m_waypoint_system = new WaypointSystem();
-	addObject(m_waypoint_system);
+	addObject(m_waypoint_system = new WaypointSystem());
 	setDirection(Vector::up);
-	m_remove_timer = 0;
 	setSpeed(0);
  
     int index = (int)m_type;
@@ -514,20 +515,28 @@ CEnemyTank::CEnemyTank(CMap* map, CTankPlayer* player, Type type) : CTank(map)
  
 	switch (m_type)
 	{
-		case(Type::power):
+		case(Type::basic):
 		{
-			m_bullet_speed = 0.75f;
+			m_bullet_speed = BattleCityConsts::BASIC_BULLET_SPEED;
+			m_health = 1;
 			break;
 		}
 		case(Type::armor):
 		{
-			m_bullet_speed = 0.17f;
+			m_bullet_speed = BattleCityConsts::FAST_BULLET_SPEED;
+			m_health = 2;
 			break;
 		}
 		case(Type::fast):
 		{
+			m_bullet_speed = BattleCityConsts::BASIC_BULLET_SPEED;
+			m_health = 1;
+			break;
+		}
+		case(Type::power):
+		{
+			m_bullet_speed = BattleCityConsts::BASIC_BULLET_SPEED;
 			m_health = 4;
-			m_bullet_speed = 0.07f;
 			break;
 		}
 	}
@@ -698,7 +707,6 @@ CEagle::CEagle()
 	m_body_sh = new CSpriteSheet();
 	m_body_sh->load(*CBattleCityGame::instance()->textureManager().get("battle_city_sheet"), { { 100,0,50,50 },{ 150,0,50,50 } });
 	addObject(m_body_sh);
-
 	m_explosion_sh = new CSpriteSheet();
 	m_explosion_sh->load(*CBattleCityGame::instance()->textureManager().get("explosion_sheet"), Vector(0, 0), Vector(92, 92), 5, 2);
 	m_explosion_sh->setOrigin({ -12,-10 });
