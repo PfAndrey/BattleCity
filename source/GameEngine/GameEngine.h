@@ -82,6 +82,10 @@ private:
 	enum class Type { NoInit, Bool, Int, Float, String } m_type;
 };
 
+class CGameObject;
+using GameObjectItr = std::list<CGameObject*>::iterator;
+using GameObjectConstItr = std::list<CGameObject*>::const_iterator;
+
 class CGameObject
 {
 public:
@@ -140,8 +144,10 @@ public:
 	{
 		return (dynamic_cast<const T*>(this) != NULL);
 	}
-	void foreachObject(std::function<void(CGameObject*)> predicate);
-	void foreachObject(std::function<void(CGameObject*, bool& need_break)> predicate);
+	GameObjectItr begin();
+	GameObjectItr end();
+	GameObjectConstItr cbegin() const;
+	GameObjectConstItr cend() const;
 	void removeObject(CGameObject* obj);
 	void clear();
 	static void invokePreupdateActions();

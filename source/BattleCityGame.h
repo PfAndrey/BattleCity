@@ -45,7 +45,6 @@ private:
 	CBattleCityGameScene* m_game_scene;
 	CBattleCityMenuScene* m_menu_scene;
 	static CBattleCityGame* s_instance;
- 
 public:
 	~CBattleCityGame();
 	static CBattleCityGame* CBattleCityGame::instance();
@@ -126,7 +125,7 @@ public:
 	void setRank(int rank);
 	int getRank() const;
 	void promote();
-	void spawn(const Vector& position, const Vector& direction);
+	void spawn(const Vector& position, const Vector& direction, bool reset_rank = false);
 private:
 	void updateSprite();
 	virtual void fire(bool armored = false);
@@ -195,7 +194,7 @@ class CBattleCityGameScene : public CGameObject
 private:
 	  void loadStage(int stage_index);
   	  CEnemyTank* spawnEnemyTank();
-	  void spawnPlayerTank();
+	  void spawnPlayerTank(bool reset_rank = false);
 	  CBonus* getRandomBonus();
 	  void addScore(int score);
 	  CFlowText* m_float_text;
@@ -205,6 +204,7 @@ private:
 	  CMap* m_walls;
 	  CEagle* m_eagle;
 	  CTankPlayer* m_player;
+	  std::set<CEnemyTank*> m_enemy_tanks;
 	  int m_enemy_spawn_counter;
 	  int m_enemy_crash_counter;
 	  int m_enemy_spawn_timer;
@@ -283,7 +283,6 @@ public:
 	sf::Color m_background_color;
 	sf::Sprite m_life_sprite;
 };
-
 
 class CCurtains : public CGameObject
 {

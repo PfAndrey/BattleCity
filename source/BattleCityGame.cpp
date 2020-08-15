@@ -2,6 +2,8 @@
 #include "BattleCityGame.h"
 #include "Pickups.h"
 
+#include<vector>
+
 const AllowedCellPredicate<ETiles> ALLOWED_CELL_PREDICATE = [](const ETiles& type)
 {
 	if (type == ETiles::empty || type == ETiles::wood)
@@ -370,67 +372,60 @@ void CTankPlayer::update(int delta_time)
 {
 	CTank::update(delta_time);
 
-	switch (getState())
+	if (this->isAlive())
 	{
-		case(EState::normal):
+		//for rank debug
+		if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num1)) setRank(0);
+		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num2)) setRank(1);
+		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num3)) setRank(2);
+		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num4)) setRank(3);
+
+
+		Vector input_direction = CBattleCityGame::instance()->inputManager().getXYAxis();
+		Vector old_direction = getDirection();
+
+		if (input_direction.x && input_direction.y)
 		{
-			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num1)) setRank(0);
-			else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num2)) setRank(1);
-			else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num3)) setRank(2);
-			else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Num4)) setRank(3);
+			input_direction.y = 0; //can move only for one axis 
+		}
 
-			Vector input_direction = CBattleCityGame::instance()->inputManager().getXYAxis();
-			
-			if (input_direction.x && input_direction.y)
-			{
-				input_direction.y = 0; //can move only for one axis 
-			}
-
-			Vector old_direction = getDirection();
-
-			if (input_direction != Vector::zero)
-			{
-				setDirection(input_direction);
-			}
+		if (input_direction != Vector::zero)
+		{
+			setDirection(input_direction);
+			setSpeed(m_tank_max_speed);
 
 			if (old_direction != getDirection()) //align on map
 			{
 				setPosition(m_map->alignToTiles(getPosition()));
-
 				updateSprite();
 			}
 
-			if (input_direction != Vector::zero)
-			{
-				setSpeed(m_tank_max_speed);
-				move(getDirection() * delta_time * getSpeed());
-			}
-
-			if (CBattleCityGame::instance()->inputManager().isButtonDown("Fire"))
-			{
-				if (m_rank <= 1)
-				{
-					if (isOvercharged() && !bulletsInMoving())
-					{
-						fire();
-					}
-				}
-				else
-				{
-					if (isOvercharged() && bulletsInMoving() < 2)
-					{
-						fire(getRank() >= 3 ? true : false);
-						if (bulletsInMoving() == 2) //two bullets
-						{
-							m_last_fire_time -= 200;  //with 200 msec interval
-						}
-					}
-
-				}
-			}
-			
-			break;
+			move(getDirection() * delta_time * getSpeed());
 		}
+
+		if (CBattleCityGame::instance()->inputManager().isButtonDown("Fire"))
+		{
+			if (m_rank <= 1)
+			{
+				if (isOvercharged() && !bulletsInMoving())
+				{
+					fire();
+				}
+			}
+			else
+			{
+				if (isOvercharged() && bulletsInMoving() < 2)
+				{
+					fire(getRank() >= 3 ? true : false);
+					if (bulletsInMoving() == 2) //two bullets
+					{
+						m_last_fire_time -= 200;  //with 200 msec interval
+					}
+				}
+
+			}
+		}
+ 
 	}
 }
 
@@ -450,11 +445,13 @@ void CTankPlayer::setRank(int rank)
 
 	if (m_rank == 0)
 	{
+		m_health = 1;
 		m_bullet_speed = BattleCityConsts::BASIC_BULLET_SPEED;
 	}
 	else
 	{
 		m_bullet_speed = BattleCityConsts::FAST_BULLET_SPEED;
+		m_health = 2;
 	}
 
 	updateSprite();
@@ -476,14 +473,16 @@ void CTankPlayer::promote()
 	setRank(rank);
 }
 
-void CTankPlayer::spawn(const Vector& position, const Vector& direction)
+void CTankPlayer::spawn(const Vector& position, const Vector& direction, bool reset_rank)
 {
-	setRank(0);
-	m_health = 1;
 	setState(CTank::EState::borning);
 	setPosition(position);
 	setDirection(direction);
 	turnOnShield(4000);
+	if (reset_rank)
+	{
+		setRank(0);
+	}
 }
 
 void CTankPlayer::fire(bool armored)
@@ -594,9 +593,6 @@ void CEnemyTank::update(int delta_time)
 {
 	CTank::update(delta_time);
 
-	if (isFreezed())
-		return;
-
 	if (getState() == EState::detonate)
 	{
 		m_remove_timer += delta_time;
@@ -609,49 +605,52 @@ void CEnemyTank::update(int delta_time)
 	{
 		m_last_move_update += delta_time;
 		m_timer += delta_time;
-
-		if (m_last_move_update > 1500 || (getSpeed() == 0 && m_last_move_update > 250))
+	
+		if (!isFreezed())
 		{
-			m_last_move_update = 0;
+			if (m_last_move_update > 2000 || (getSpeed() == 0 && m_last_move_update > 100))
+			{
+				m_last_move_update = 0;
 
-			//Enemy Tank AI -------------------------------------
-			bool path_finded = true;
-			if (m_timer < m_period_time) // Random move of the 1/3 time
-			{
-				path_finded = moveInRandomDirection();
+				//Enemy Tank AI -------------------------------------
+				bool path_finded = true;
+				if (m_timer < m_period_time) // Random move of the 1/3 time
+				{
+					path_finded = moveInRandomDirection();
+				}
+				else if (m_timer < 2 * m_period_time) // attack player tank
+				{
+					path_finded = moveToPoint(m_map->toMapCoordinates(m_player->getPosition(), true));
+				}
+				else if (m_timer < 3 * m_period_time) // attack eagle
+				{
+					path_finded = moveToPoint(BattleCityConsts::EAGLE_TILE);
+				}
+				else
+				{
+					m_timer = 0;
+				}
+				//------------------------------------------------------
 			}
-			else if (m_timer < 2 * m_period_time) // attack player tank
+
+			int max_bulles = (m_type == Type::armor) ? 2 : 1;
+			if (isOvercharged() && bulletsInMoving() < max_bulles && std::rand() % 32 == 0)
 			{
-				path_finded = moveToPoint(m_map->toMapCoordinates(m_player->getPosition(), true));
+				fire();
 			}
-			else if (m_timer < 3 * m_period_time) // attack eagle
-			{
-				path_finded = moveToPoint(BattleCityConsts::EAGLE_TILE);
-			}
-			else
-			{
-				m_timer = 0;
-			}
-			//------------------------------------------------------
+
+			auto direction = getDirection();
+			if (direction == Vector::right)  m_animator.play("right");
+			else if (direction == Vector::left)  m_animator.play("left");
+			else if (direction == Vector::up)  m_animator.play("up");
+			else if (direction == Vector::down)  m_animator.play("down");
 		}
-
 		if (m_flashed)
 		{
 			float color = 200 + 50 * cos(m_timer / 150);
 			setBodyColor(sf::Color(color, color, color));
 		}
 
-		int max_bulles = (m_type == Type::armor) ? 2 : 1;
-		if (isOvercharged() && bulletsInMoving() < max_bulles && std::rand() % 32 == 0)
-		{
-			fire();
-		}
-
-		auto direction = getDirection();
-		if (direction == Vector::right)  m_animator.play("right");
-		else if (direction == Vector::left)  m_animator.play("left");
-		else if (direction == Vector::up)  m_animator.play("up");
-		else if (direction == Vector::down)  m_animator.play("down");
 	}
 }
 
@@ -792,7 +791,6 @@ CBattleCityGameScene::CBattleCityGameScene()
 	m_score_label->setOutlineThickness(1);
 	addObject(m_score_label);
 
-
 	m_lifes_label = m_score_label->clone();
 	m_lifes_label->setBounds(715,460,95,20);
 	addObject(m_lifes_label);
@@ -855,9 +853,9 @@ void CBattleCityGameScene::reset()
 	for (auto bonus : bonuses)
 		bonus->reset();
 
-	auto enemy_tanks = findObjectsByType<CEnemyTank>();
-	for (auto tank : enemy_tanks)
+	for (auto tank : m_enemy_tanks)
 		removeObject(tank);
+	m_enemy_tanks.clear();
 
 	auto bullets = findObjectsByType<CBullet>();
 	for (auto bullet : bullets)
@@ -895,12 +893,16 @@ CEnemyTank* CBattleCityGameScene::spawnEnemyTank()
 	enemy_tank->setState(CTank::EState::borning);
 	enemy_tank->setPosition(m_walls->toPixelCoordinates(BattleCityConsts::ENEMY_SPAWN_TILES[m_enemy_spawn_counter % 3]));
 	enemy_tank->setDirection(Vector::down);
+	
+	m_enemy_tanks.insert(enemy_tank);
+	
 	return enemy_tank;
 }
 
-void CBattleCityGameScene::spawnPlayerTank()
+void CBattleCityGameScene::spawnPlayerTank(bool reset_rank)
 {
-	m_player->spawn(m_walls->toPixelCoordinates(BattleCityConsts::PLAYER_SPAWN_TILE), Vector::up);
+	m_player->spawn(m_walls->toPixelCoordinates(BattleCityConsts::PLAYER_SPAWN_TILE), Vector::up, reset_rank);
+
 }
 
 void CBattleCityGameScene::addScore(int score)
@@ -924,8 +926,7 @@ void CBattleCityGameScene::removeLifeFromPlayerTank()
 
 void CBattleCityGameScene::blowupAllTanks()
 {
-	auto enemy_tanks =  findObjectsByType<CEnemyTank>();
-	for (auto enemy_tank : enemy_tanks)
+	for (auto enemy_tank : m_enemy_tanks)
 	{
 		if (enemy_tank->isAlive())
 		{
@@ -934,49 +935,23 @@ void CBattleCityGameScene::blowupAllTanks()
 			m_enemy_crash_counter++;
 		}
 	}
+	m_enemy_tanks.clear();
 }
 
 CBonus* CBattleCityGameScene::getRandomBonus()
 {
-	CBonus* bonus = NULL;
-
-	int n = std::rand() % 6;
-
+	const int n = std::rand() % 6;
 	switch (n)
 	{
-	  case 0:
-	  {
-		bonus = new CGrenede();
-		break;
-	  }
-	  case 1:
-	  {
-		bonus = new CFreezer();
-		break;
-	  }
-	  case 2:
-	  {
-		  bonus = new CHelmet();
-		  break;
-	  }
-	  case 3:
-	  {
-		  bonus = new CShovel();
-		  break;
-	  }
-	  case 4:
-	  {
-		  bonus = new CStar();
-		  break;
-	  }
-	  case 5:
-	  {
-		  bonus = new CLife();
-		  break;
-	  }
+		case 0: return new CGrenede();
+		case 1: return new CFreezer();
+		case 2: return new CHelmet();
+		case 3: return new CShovel();;
+		case 4: return new CStar();
+		case 5: return new CLife();
 	}
-
-	return bonus;
+	 
+	return nullptr;
 }
 
 void CBattleCityGameScene::hideHUD()
@@ -1006,7 +981,7 @@ void CBattleCityGameScene::update(int delta_time)
 	
 	if (m_enemy_spawn_timer > BattleCityConsts::ENEMY_SPAWN_TIME)
 	{
-		if (findObjectsByType<CEnemyTank>().size() < 4 && m_enemy_spawn_counter < m_tanks_on_level)
+		if (m_enemy_tanks.size() < 4 && m_enemy_spawn_counter < m_tanks_on_level)
 		{
 			CEnemyTank* tank = spawnEnemyTank();
 			if (m_enemy_spawn_counter % BattleCityConsts::BONUS_TANKS_ST == 0)
@@ -1015,10 +990,10 @@ void CBattleCityGameScene::update(int delta_time)
 		m_enemy_spawn_timer = 0;
 	}
 	 
+	std::vector<CTank*> tanks(m_enemy_tanks.begin(), m_enemy_tanks.end());
+	tanks.push_back(m_player);
 
-	auto tanks = findObjectsByType<CTank>(); 
-
-	foreachObject([this, &tanks](CGameObject* obj)
+	for(auto obj : *this)
 	{
 		//BONUS PICKUP PROCESSING
 		if (obj->getName() == "Bonus" && !obj->castTo<CBonus>()->isPickuping())
@@ -1030,8 +1005,7 @@ void CBattleCityGameScene::update(int delta_time)
 				addScore(500);
 			}
 		}
-
-		if (obj->getName() == "Bullet" && !obj->castTo<CBullet>()->isDetonated())
+		else if (obj->getName() == "Bullet" && !obj->castTo<CBullet>()->isDetonated())
 		{
 			enum class Endstatus { none, block_broken, armor_push, player_detonate, enemy_detonate, bullet_bullet, damage } end_status = Endstatus::none;
 
@@ -1096,6 +1070,9 @@ void CBattleCityGameScene::update(int delta_time)
 								m_enemy_crash_counter++;
 								addScore(score);
 								end_status = Endstatus::enemy_detonate;
+								auto it = m_enemy_tanks.find((CEnemyTank*)tank);
+								if (it != m_enemy_tanks.end())
+									m_enemy_tanks.erase(it);
 							}
 							else
 							{
@@ -1145,7 +1122,6 @@ void CBattleCityGameScene::update(int delta_time)
 
 			switch (end_status)
 			{
-
 				case(Endstatus::armor_push):
 				{
 					if (bullet->source() == m_player)
@@ -1190,38 +1166,31 @@ void CBattleCityGameScene::update(int delta_time)
 			}
 
 			//Bullets crash bullets
-			foreachObject([obj,this](CGameObject* obj2, bool& need_break)
+			for (auto obj2 : *this)
 			{
 				if (obj2->getName() == "Bullet")
 				{
 					CBullet* bullet_one = obj->castTo<CBullet>();
 					CBullet* bullet_two = obj2->castTo<CBullet>();
 
-					if (obj != obj2)
+					if (bullet_one != bullet_two && !bullet_one->isDetonated() && !bullet_two->isDetonated())
 					{
-						need_break = false;
-						if ((bullet_one->getBounds().center() - bullet_two->getBounds().center()).length() < 10
-							&& !bullet_one->isDetonated() && !bullet_two->isDetonated())
+						if ((bullet_one->getBounds().center() - bullet_two->getBounds().center()).length() < 10)
 						{
 							bullet_one->detonate(true);
 							bullet_two->detonate(true);
+							break;
 						}
 					}
-					else
-					{
-						need_break = true;
-					}
 				}
-			});
-
+			}
 		}
-	});
+	}
 
 	// TANKS COLLISION PROCESSING
 	static const auto setOldPosition = [delta_time](CTank* tank)
 	{
-		tank->setPosition(tank->getPosition() - delta_time*tank->getSpeed()*tank->getDirection());
-		tank->setSpeed(0);
+		tank->move(-delta_time*tank->getSpeed()*tank->getDirection());
 	 	tank->stop();
 	};
 	

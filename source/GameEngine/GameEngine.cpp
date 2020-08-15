@@ -670,22 +670,6 @@ void CGameObject::postDraw(sf::RenderWindow* window)
                 obj->postDraw(window);
 }
 
-void CGameObject::foreachObject(std::function<void(CGameObject*)> predicate)
-{
-    for (auto& obj : m_objects)
-        predicate(obj);
-}
-void CGameObject::foreachObject(std::function<void(CGameObject*, bool& )> predicate)
-{
-    bool need_break = false;
-    for (auto& obj : m_objects)
-    {
-        predicate(obj, need_break);
-        if (need_break)
-            break;
-    }
-}
-
 void CGameObject::removeObject(CGameObject* object)
 {
     auto action = [this, object]() //remove object later
@@ -706,7 +690,6 @@ void CGameObject::onPropertySet(const std::string& name)
         setPosition(getPosition().x, m_properties["y"].asFloat());
     else if (name == "name")
         setName(m_properties["name"].asString());
-
 }
 
 void CGameObject::onPropertyGet(const std::string& name) const
@@ -781,6 +764,26 @@ void CGameObject::invokePreupdateActions()
     for (auto& action : m_preupdate_actions)
         action();
     m_preupdate_actions.clear();
+}
+
+GameObjectItr CGameObject::begin() 
+{ 
+	return m_objects.begin();
+}
+
+GameObjectItr CGameObject::end() 
+{ 
+	return m_objects.end();
+}
+
+GameObjectConstItr CGameObject::cbegin() const 
+{ 
+	return m_objects.cbegin(); 
+}
+
+GameObjectConstItr CGameObject::cend() const
+{ 
+	return m_objects.cend(); 
 }
 
 //---------------------------------------------------------------------------------------------------------
